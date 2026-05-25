@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,19 +17,15 @@ import (
 // Create a new TaskManager using New(), register handlers with RegisterHandler(),
 // and start background workers with StartWorkers().
 type TaskManager struct {
-	config       Config
-	room         *room
-	registry     *handlerRegistry
-	scheduler    *scheduler
-	approvalFunc ApprovalDecisionFunc
-	db           *sql.DB
+	config    Config
+	room      *room
+	registry  *handlerRegistry
+	scheduler *scheduler
+	db        *sql.DB
 }
 
-// New creates a new TaskManager with the given configuration and approval function.
+// New creates a new TaskManager with the given configuration.
 // This initializes the database connection and runs migrations automatically.
-//
-// The approvalFunc determines whether tasks require approval before execution.
-// If nil, DefaultApprovalDecision is used (auto-approves all tasks).
 //
 // Example:
 //
@@ -44,22 +39,18 @@ type TaskManager struct {
 //	    },
 //	}
 //
-//	tm, err := waitingroom.New(config, myApprovalFunc)
+//	tm, err := waitingroom.New(config)
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
 //	defer tm.Close()
-func New(config Config, approvalFunc ApprovalDecisionFunc) (*TaskManager, error) {
+func New(config Config) (*TaskManager, error) {
 	config.setDefaults()
 
 	// Get database connection URL
 	databaseURL, err := config.Database.ConnectionString()
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrConfigInvalid, err)
-	}
-
-	if approvalFunc == nil {
-		approvalFunc = DefaultApprovalDecision
 	}
 
 	// Open database connection
@@ -87,11 +78,10 @@ func New(config Config, approvalFunc ApprovalDecisionFunc) (*TaskManager, error)
 	}
 
 	tm := &TaskManager{
-		config:       config,
-		room:         r,
-		registry:     newHandlerRegistry(),
-		approvalFunc: approvalFunc,
-		db:           db,
+		config:   config,
+		room:     r,
+		registry: newHandlerRegistry(),
+		db:       db,
 	}
 
 	return tm, nil
@@ -123,22 +113,36 @@ func (tm *TaskManager) HandlerCount() int {
 
 // CreateTask creates a new task with the given type and payload.
 // The approval decision function determines if the task requires approval.
-// If auto-approved and no schedule is set, the task runs immediately.
+// Approved tasks are queued for execution by the scheduler; they do not run immediately.
 //
 // The taskType must have a registered handler, or ErrHandlerNotFound is returned.
 // The payload is passed to the handler's Execute method when the task runs.
 // Metadata can be used to store custom data with the task.
 //
+// A custom approval function can be provided via opts.ApprovalFunc to override
+// the default approval logic for this specific task.
+//
+// If opts is nil, default values are used (auto-approve, no schedule, no metadata).
+//
 // Returns the created task with its assigned ID and initial status.
-func (tm *TaskManager) CreateTask(ctx context.Context, taskType string, payload json.RawMessage, opts CreateOptions) (*Task, error) {
+func (tm *TaskManager) CreateTask(ctx context.Context, taskType string, payload json.RawMessage, opts *CreateOptions) (*Task, error) {
 	// Validate that a handler exists for this task type
-	handler, err := tm.registry.get(taskType)
-	if err != nil {
+	if _, err := tm.registry.get(taskType); err != nil {
 		return nil, err
 	}
 
+	// Use default options if nil
+	if opts == nil {
+		opts = &CreateOptions{}
+	}
+
 	// Determine if approval is required
-	approvalDecision := tm.approvalFunc(ctx, taskType, payload)
+	// Use per-task approval function if provided, otherwise auto-approve
+	approvalFunc := opts.ApprovalFunc
+	if approvalFunc == nil {
+		approvalFunc = DefaultApprovalDecision
+	}
+	approvalDecision := approvalFunc(ctx, taskType, payload)
 
 	now := time.Now().UTC()
 	task := &Task{
@@ -169,26 +173,6 @@ func (tm *TaskManager) CreateTask(ctx context.Context, taskType string, payload 
 	// Save the task
 	if err := tm.room.Create(ctx, task); err != nil {
 		return nil, err
-	}
-
-	// If auto-approved and not scheduled, execute immediately
-	if !approvalDecision.RequiresApproval && task.Status == TaskStatusApproved {
-		// Execute synchronously
-		task.Status = TaskStatusRunning
-		task.RunAt = timePtr(time.Now().UTC())
-		tm.room.Update(ctx, task)
-
-		execErr := handler.Execute(ctx, task)
-
-		if execErr != nil {
-			log.Printf("Task %s failed: %v", task.ID, execErr)
-			task.Status = TaskStatusFailed
-		} else {
-			task.Status = TaskStatusCompleted
-		}
-
-		task.UpdatedAt = time.Now().UTC()
-		tm.room.Update(ctx, task)
 	}
 
 	return task, nil

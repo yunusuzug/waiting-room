@@ -60,14 +60,6 @@ func (e *EmailTask) Execute(ctx context.Context, task *waitingroom.Task) error {
 func main() {
     ctx := context.Background()
 
-    // Define approval logic
-    approvalFunc := func(ctx context.Context, taskType string, payload json.RawMessage) waitingroom.ApprovalDecision {
-        if taskType == "send_email" {
-            return waitingroom.ApprovalDecision{RequiresApproval: false}
-        }
-        return waitingroom.ApprovalDecision{RequiresApproval: true}
-    }
-
     // Initialize the library - database tables are created automatically
     config := waitingroom.Config{
         Database: waitingroom.DatabaseConfig{
@@ -81,7 +73,7 @@ func main() {
         WorkerInterval: time.Minute,
     }
 
-    tm, err := waitingroom.New(config, approvalFunc)
+    tm, err := waitingroom.New(config)
     if err != nil {
         log.Fatal(err)
     }
@@ -94,7 +86,7 @@ func main() {
     tm.StartWorkers(ctx)
     defer tm.StopWorkers()
 
-    // Create a task with metadata
+    // Create a task with metadata and custom approval logic
     payload, _ := json.Marshal(map[string]string{
         "to":      "user@example.com",
         "subject": "Hello",
@@ -104,8 +96,15 @@ func main() {
         "ip": "192.168.1.1",
     })
 
-    task, err := tm.CreateTask(ctx, "send_email", payload, waitingroom.CreateOptions{
+    task, err := tm.CreateTask(ctx, "send_email", payload, &waitingroom.CreateOptions{
         Metadata: metadata,
+        ApprovalFunc: func(ctx context.Context, taskType string, payload json.RawMessage) waitingroom.ApprovalDecision {
+            // Custom approval logic for this specific task
+            if taskType == "send_email" {
+                return waitingroom.ApprovalDecision{RequiresApproval: false, Reason: "Auto-approved"}
+            }
+            return waitingroom.ApprovalDecision{RequiresApproval: true, Reason: "Requires manual approval"}
+        },
     })
     if err != nil {
         log.Fatal(err)
@@ -176,7 +175,7 @@ The library exposes a minimal public API surface:
 - Error variables (e.g., `ErrTaskNotFound`, `ErrHandlerNotFound`)
 
 ### Functions
-- `New(config, approvalFunc)` - Create a new TaskManager (with auto-migration)
+- `New(config)` - Create a new TaskManager (with auto-migration)
 - `NewTaskHandler(taskType, execFunc)` - Create handler from function
 - `DefaultApprovalDecision`, `AlwaysRequireApproval`, `ConditionalApproval` - Pre-built approval functions
 
@@ -317,13 +316,17 @@ Create Task
 ## API Methods
 
 ### CreateTask
-Creates a new task. The approval function determines if it requires approval.
+Creates a new task. The approval function (passed via CreateOptions) determines if it requires approval.
 
 ```go
-task, err := tm.CreateTask(ctx, "send_email", payload, waitingroom.CreateOptions{
-    ScheduledAt: &futureTime,  // Optional: schedule for later
-    Metadata:    metadata,     // Optional: custom data
+task, err := tm.CreateTask(ctx, "send_email", payload, &waitingroom.CreateOptions{
+    ScheduledAt:  &futureTime,  // Optional: schedule for later
+    Metadata:     metadata,     // Optional: custom data
+    ApprovalFunc: myApprovalFunc, // Optional: per-task approval logic
 })
+
+// Or with nil (uses defaults - auto-approve, no schedule, no metadata)
+task, err := tm.CreateTask(ctx, "send_email", payload, nil)
 ```
 
 ### Get
@@ -439,7 +442,7 @@ metadata, _ := json.Marshal(map[string]string{
     "ip_address": "192.168.1.1",
 })
 
-task, err := tm.CreateTask(ctx, "send_email", payload, waitingroom.CreateOptions{
+task, err := tm.CreateTask(ctx, "send_email", payload, &waitingroom.CreateOptions{
     Metadata: metadata,
 })
 

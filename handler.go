@@ -17,7 +17,7 @@
 //	    },
 //	}
 //
-//	tm, err := waitingroom.New(config, myApprovalFunc)
+//	tm, err := waitingroom.New(config)
 //	if err != nil {
 //	    log.Fatal(err)
 //	}

@@ -115,6 +115,12 @@ type CreateOptions struct {
 
 	// Metadata contains custom user-defined data to store with the task.
 	Metadata json.RawMessage
+
+	// ApprovalFunc is an optional per-task approval function.
+	// If provided, this function is used instead of the TaskManager's
+	// default approval function to determine if this specific task
+	// requires approval. If nil, the default approval function is used.
+	ApprovalFunc ApprovalDecisionFunc
 }
 
 // ListFilter contains criteria for listing tasks.

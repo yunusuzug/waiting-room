@@ -101,41 +101,6 @@ func main() {
 	dbUser := getEnvOrDefault("DB_USER", "postgres")
 	dbPassword := getEnvOrDefault("DB_PASSWORD", "postgres")
 
-	// Create approval decision function
-	// Auto-approve simple emails, require approval for bulk and reports
-	approvalFunc := func(ctx context.Context, taskType string, payload json.RawMessage) waitingroom.ApprovalDecision {
-		switch taskType {
-		case "send_email":
-			var data struct {
-				Bulk bool `json:"bulk"`
-			}
-			json.Unmarshal(payload, &data)
-
-			if data.Bulk {
-				return waitingroom.ApprovalDecision{
-					RequiresApproval: true,
-					Reason:           "Bulk email requires approval",
-				}
-			}
-			return waitingroom.ApprovalDecision{
-				RequiresApproval: false,
-				Reason:           "Single email auto-approved",
-			}
-
-		case "generate_report":
-			return waitingroom.ApprovalDecision{
-				RequiresApproval: true,
-				Reason:           "Reports require manual approval",
-			}
-
-		default:
-			return waitingroom.ApprovalDecision{
-				RequiresApproval: true,
-				Reason:           "Unknown task type requires approval",
-			}
-		}
-	}
-
 	// Create configuration
 	// Migration runs automatically by default
 	config := waitingroom.Config{
@@ -155,7 +120,7 @@ func main() {
 
 	// Initialize the task manager
 	// Database tables are created automatically
-	tm, err := waitingroom.New(config, approvalFunc)
+	tm, err := waitingroom.New(config)
 	if err != nil {
 		log.Fatalf("Failed to create task manager: %v", err)
 	}
@@ -195,9 +160,44 @@ func main() {
 			return
 		}
 
-		opts := waitingroom.CreateOptions{
-			ScheduledAt: req.ScheduledAt,
-			Metadata:    req.Metadata,
+		// Approval function: Auto-approve simple emails, require approval for bulk and reports
+		approvalFunc := func(ctx context.Context, taskType string, payload json.RawMessage) waitingroom.ApprovalDecision {
+			switch taskType {
+			case "send_email":
+				var data struct {
+					Bulk bool `json:"bulk"`
+				}
+				json.Unmarshal(payload, &data)
+
+				if data.Bulk {
+					return waitingroom.ApprovalDecision{
+						RequiresApproval: true,
+						Reason:           "Bulk email requires approval",
+					}
+				}
+				return waitingroom.ApprovalDecision{
+					RequiresApproval: false,
+					Reason:           "Single email auto-approved",
+				}
+
+			case "generate_report":
+				return waitingroom.ApprovalDecision{
+					RequiresApproval: true,
+					Reason:           "Reports require manual approval",
+				}
+
+			default:
+				return waitingroom.ApprovalDecision{
+					RequiresApproval: true,
+					Reason:           "Unknown task type requires approval",
+				}
+			}
+		}
+
+		opts := &waitingroom.CreateOptions{
+			ScheduledAt:  req.ScheduledAt,
+			Metadata:     req.Metadata,
+			ApprovalFunc: approvalFunc,
 		}
 
 		task, err := tm.CreateTask(r.Context(), req.Type, req.Payload, opts)
