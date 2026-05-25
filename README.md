@@ -15,7 +15,7 @@ A Go library for managing tasks with approval workflows, scheduling, and distrib
 ## Installation
 
 ```bash
-go get github.com/example/waiting-room
+go get https://github.com/yunusuzug/waiting-room
 ```
 
 ## Quick Start
@@ -30,7 +30,7 @@ import (
     "log"
     "time"
 
-    "github.com/example/waiting-room"
+    "github.com/yunusuzug/waiting-room"
 )
 
 // Define a task handler
