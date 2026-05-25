@@ -15,7 +15,6 @@
 //	        User:     "user",
 //	        Password: "pass",
 //	    },
-//	    ApplicationID: "my-app",
 //	}
 //
 //	tm, err := waitingroom.New(config, myApprovalFunc)

@@ -82,10 +82,6 @@ type Config struct {
 	// Required.
 	Database DatabaseConfig
 
-	// ApplicationID identifies which application owns the tasks.
-	// This is used to distinguish tasks from different applications in the same database.
-	ApplicationID string
-
 	// WorkerInterval is the polling interval for the scheduler to check
 	// for pending and scheduled tasks. Default is 1 minute.
 	WorkerInterval time.Duration

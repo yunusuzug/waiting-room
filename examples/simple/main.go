@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/example/waiting-room"
+	"github.com/yunusuzug/waiting-room"
 )
 
 // EmailTask is a task handler for sending emails.
@@ -147,7 +147,6 @@ func main() {
 			Password: dbPassword,
 			SSLMode:  "disable",
 		},
-		ApplicationID:      "example-app",
 		WorkerInterval:     30 * time.Second,
 		LockTimeout:        5 * time.Minute,
 		MaxConcurrentTasks: 5,

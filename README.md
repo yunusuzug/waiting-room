@@ -7,7 +7,6 @@ A Go library for managing tasks with approval workflows, scheduling, and distrib
 - **Approval Workflows**: Define custom approval logic for different task types
 - **Scheduled Tasks**: Schedule tasks to run at specific times
 - **Distributed Execution**: Multiple instances can share the workload without conflicts using PostgreSQL-based distributed locking
-- **Multi-Application Support**: Multiple applications can use the same database with different ApplicationID values
 - **Manual Retry**: Failed tasks require explicit retry via API
 - **Class-Based Handlers**: Applications implement the `TaskHandler` interface for task types
 - **Custom Metadata**: Store additional custom data with each task
@@ -79,7 +78,6 @@ func main() {
             Password: "password",
             SSLMode:  "disable",
         },
-        ApplicationID:  "my-app",
         WorkerInterval: time.Minute,
     }
 
@@ -137,7 +135,6 @@ type DatabaseConfig struct {
 ```go
 type Config struct {
     Database           DatabaseConfig  // PostgreSQL config (required)
-    ApplicationID      string          // Identifies the application (optional)
     WorkerInterval     time.Duration   // Polling interval (default: 1m)
     LockTimeout        time.Duration   // Lock timeout (default: 5m)
     MaxConcurrentTasks int             // Max concurrent tasks (default: 10)
@@ -430,36 +427,6 @@ The library creates two tables automatically:
 | locked_at | TIMESTAMP | When the lock was acquired |
 | expires_at | TIMESTAMP | When the lock expires |
 | instance_id | VARCHAR(255) | Which instance holds the lock |
-
-## Multi-Application Support
-
-Multiple applications can share the same PostgreSQL database using different ApplicationID values in their Config:
-
-```go
-// Application A
-configA := waitingroom.Config{
-    Database: waitingroom.DatabaseConfig{
-        Host:     "localhost",
-        Port:     "5432",
-        Name:     "waitingroom",
-        User:     "app_a_user",
-        Password: "password",
-    },
-    ApplicationID: "app_a",
-}
-
-// Application B
-configB := waitingroom.Config{
-    Database: waitingroom.DatabaseConfig{
-        Host:     "localhost",
-        Port:     "5432",
-        Name:     "waitingroom",
-        User:     "app_b_user",
-        Password: "password",
-    },
-    ApplicationID: "app_b",
-}
-```
 
 ## Metadata
 
