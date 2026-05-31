@@ -123,6 +123,18 @@ type CreateOptions struct {
 	ApprovalFunc ApprovalDecisionFunc
 }
 
+// ApproveOptions contains options for approving a task.
+type ApproveOptions struct {
+	// ApprovedBy identifies who approved the task (e.g., email or user ID).
+	// Required.
+	ApprovedBy string
+
+	// ScheduledAt specifies when the task should be executed.
+	// If nil, the task runs immediately after approval.
+	// This overrides any schedule set during task creation.
+	ScheduledAt *time.Time
+}
+
 // ListFilter contains criteria for listing tasks.
 type ListFilter struct {
 	// Status filters tasks by status.

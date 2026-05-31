@@ -192,13 +192,22 @@ func (tm *TaskManager) List(ctx context.Context, filter ListFilter) ([]*Task, er
 }
 
 // Approve approves a pending task.
-// If the task has a scheduled time in the future, it transitions to "scheduled" status.
-// If no schedule is set or the time has passed, it transitions to "approved" status
-// and will be picked up by the scheduler for execution.
+// If opts.ScheduledAt is set to a future time, the task transitions to "scheduled" status.
+// If opts.ScheduledAt is nil, the task's original schedule is used.
+// If no schedule is set or opts.ScheduledAt is in the past, the task is invalid.
+//
+// The opts.ScheduledAt overrides any schedule set during task creation.
 //
 // Returns ErrCannotApprove if the task is not in pending status.
 // Returns ErrTaskNotFound if the task does not exist.
-func (tm *TaskManager) Approve(ctx context.Context, taskID string, approvedBy string) (*Task, error) {
+func (tm *TaskManager) Approve(ctx context.Context, taskID string, opts *ApproveOptions) (*Task, error) {
+	if opts == nil {
+		return nil, ErrApproveOptionsRequired
+	}
+	if opts.ApprovedBy == "" {
+		return nil, ErrApprovedByRequired
+	}
+
 	task, err := tm.room.Get(ctx, taskID)
 	if err != nil {
 		return nil, err
@@ -209,13 +218,23 @@ func (tm *TaskManager) Approve(ctx context.Context, taskID string, approvedBy st
 	}
 
 	now := time.Now().UTC()
-	task.ApprovedBy = &approvedBy
+	task.ApprovedBy = &opts.ApprovedBy
 	task.ApprovedAt = &now
 	task.UpdatedAt = now
 
+	// Use schedule from approve options if provided, otherwise use task's original schedule
+	scheduleAt := opts.ScheduledAt
+	if scheduleAt == nil {
+		scheduleAt = task.ScheduledAt
+	}
+
 	// Determine next status based on scheduled time
-	if task.ScheduledAt != nil && task.ScheduledAt.After(now) {
+	if scheduleAt != nil {
+		if !scheduleAt.After(now) {
+			return nil, ErrInvalidSchedule
+		}
 		task.Status = TaskStatusScheduled
+		task.ScheduledAt = scheduleAt
 	} else {
 		task.Status = TaskStatusApproved
 	}

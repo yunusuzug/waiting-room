@@ -253,7 +253,20 @@ func main() {
 			approvedBy = "api"
 		}
 
-		task, err := tm.Approve(r.Context(), id, approvedBy)
+		// Parse optional schedule from query (e.g., ?by=admin@example.com&schedule=2026-06-01T10:00:00Z)
+		var scheduleAt *time.Time
+		if scheduleStr := r.URL.Query().Get("schedule"); scheduleStr != "" {
+			if parsed, err := time.Parse(time.RFC3339, scheduleStr); err == nil {
+				scheduleAt = &parsed
+			}
+		}
+
+		opts := &waitingroom.ApproveOptions{
+			ApprovedBy:  approvedBy,
+			ScheduledAt: scheduleAt,
+		}
+
+		task, err := tm.Approve(r.Context(), id, opts)
 		if err != nil {
 			if err == waitingroom.ErrTaskNotFound {
 				http.Error(w, "Task not found", http.StatusNotFound)
@@ -261,6 +274,14 @@ func main() {
 			}
 			if err == waitingroom.ErrCannotApprove {
 				http.Error(w, "Task cannot be approved in current state", http.StatusBadRequest)
+				return
+			}
+			if err == waitingroom.ErrApproveOptionsRequired || err == waitingroom.ErrApprovedByRequired {
+				http.Error(w, "Missing required approve options", http.StatusBadRequest)
+				return
+			}
+			if err == waitingroom.ErrInvalidSchedule {
+				http.Error(w, "Schedule time must be in the future", http.StatusBadRequest)
 				return
 			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)

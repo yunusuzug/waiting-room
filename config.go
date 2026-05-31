@@ -48,10 +48,10 @@ func (d *DatabaseConfig) setDefaults() {
 // Validate checks that all required database fields are set.
 func (d *DatabaseConfig) Validate() error {
 	if d.Name == "" {
-		return fmt.Errorf("database name is required")
+		return ErrDatabaseNameRequired
 	}
 	if d.User == "" {
-		return fmt.Errorf("database user is required")
+		return ErrDatabaseUserRequired
 	}
 	return nil
 }

@@ -170,7 +170,7 @@ The library exposes a minimal public API surface:
 - `Task` - Task model with all task data
 - `TaskStatus` - Task status constants
 - `Config`, `DatabaseConfig` - Configuration
-- `CreateOptions`, `ListFilter` - Options for operations
+- `CreateOptions`, `ApproveOptions`, `ListFilter` - Options for operations
 - `ApprovalDecision`, `ApprovalDecisionFunc` - Approval logic
 - Error variables (e.g., `ErrTaskNotFound`, `ErrHandlerNotFound`)
 
@@ -348,10 +348,19 @@ tasks, err := tm.List(ctx, waitingroom.ListFilter{
 ```
 
 ### Approve
-Approves a pending task.
+Approves a pending task. You can optionally schedule it for a specific time.
 
 ```go
-task, err := tm.Approve(ctx, taskID, "admin@example.com")
+// Approve immediately
+task, err := tm.Approve(ctx, taskID, &waitingroom.ApproveOptions{
+    ApprovedBy: "admin@example.com",
+})
+
+// Approve and schedule for later
+task, err := tm.Approve(ctx, taskID, &waitingroom.ApproveOptions{
+    ApprovedBy:  "admin@example.com",
+    ScheduledAt: &nextMonday, // Overrides any schedule set during creation
+})
 ```
 
 ### Cancel
@@ -539,6 +548,11 @@ var (
     ErrCannotRetry               = errors.New("task cannot be retried")
     ErrWorkersAlreadyRunning     = errors.New("workers are already running")
     ErrConfigInvalid             = errors.New("invalid configuration")
+    ErrApproveOptionsRequired    = errors.New("approve options are required")
+    ErrApprovedByRequired        = errors.New("approved_by is required")
+    ErrInvalidSchedule           = errors.New("scheduled_at must be in the future")
+    ErrDatabaseNameRequired      = errors.New("database name is required")
+    ErrDatabaseUserRequired      = errors.New("database user is required")
     // ... etc
 )
 ```

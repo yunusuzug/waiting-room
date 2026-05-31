@@ -48,4 +48,19 @@ var (
 
 	// ErrCannotRetry indicates the task cannot be retried in its current state.
 	ErrCannotRetry = errors.New("task cannot be retried")
+
+	// ErrApproveOptionsRequired indicates the approve options are nil.
+	ErrApproveOptionsRequired = errors.New("approve options are required")
+
+	// ErrApprovedByRequired indicates the approved_by field is empty.
+	ErrApprovedByRequired = errors.New("approved_by is required")
+
+	// ErrInvalidSchedule indicates the scheduled time is invalid (not in the future).
+	ErrInvalidSchedule = errors.New("scheduled_at must be in the future")
+
+	// ErrDatabaseNameRequired indicates the database name is missing.
+	ErrDatabaseNameRequired = errors.New("database name is required")
+
+	// ErrDatabaseUserRequired indicates the database user is missing.
+	ErrDatabaseUserRequired = errors.New("database user is required")
 )
