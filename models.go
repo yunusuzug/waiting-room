@@ -53,28 +53,28 @@ type Task struct {
 	Metadata json.RawMessage `json:"metadata,omitempty"`
 
 	// RequiresApproval indicates whether this task needs approval before execution.
-	RequiresApproval bool `json:"requires_approval"`
+	RequiresApproval bool `json:"requiresApproval"`
 
 	// ApprovedBy identifies who approved the task (null for auto-approved tasks).
-	ApprovedBy *string `json:"approved_by,omitempty"`
+	ApprovedBy *string `json:"approvedBy,omitempty"`
 
 	// ApprovedAt is the time when the task was approved.
-	ApprovedAt *time.Time `json:"approved_at,omitempty"`
+	ApprovedAt *time.Time `json:"approvedAt,omitempty"`
 
 	// ScheduledAt is when the task should be executed (nil means run immediately when approved).
-	ScheduledAt *time.Time `json:"scheduled_at,omitempty"`
+	ScheduledAt *time.Time `json:"scheduledAt,omitempty"`
 
 	// CreatedAt is when the task was created.
-	CreatedAt time.Time `json:"created_at"`
+	CreatedAt time.Time `json:"createdAt"`
 
 	// UpdatedAt is when the task was last modified.
-	UpdatedAt time.Time `json:"updated_at"`
+	UpdatedAt time.Time `json:"updatedAt"`
 
 	// RunAt is when the task was actually executed (nil if not yet run).
-	RunAt *time.Time `json:"run_at,omitempty"`
+	RunAt *time.Time `json:"runAt,omitempty"`
 
 	// RetryCount tracks how many times this task has been retried.
-	RetryCount int `json:"retry_count"`
+	RetryCount int `json:"retryCount"`
 }
 
 // IsTerminal returns true if the task is in a terminal state (completed, failed, or cancelled).

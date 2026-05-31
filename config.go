@@ -94,9 +94,10 @@ type Config struct {
 	// Default is 10.
 	MaxConcurrentTasks int
 
-	// instanceID is internally generated to uniquely identify this running instance
-	// for distributed locking. It is auto-generated on each startup.
-	instanceID string
+	// SkipMigration disables automatic database migration on initialization.
+	// Use this if you prefer to run migrations manually.
+	// Default is false (migration runs automatically).
+	SkipMigration bool
 }
 
 // setDefaults applies default values for unspecified configuration options.

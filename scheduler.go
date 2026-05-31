@@ -211,8 +211,3 @@ func (s *scheduler) completeTask(ctx context.Context, taskID string) {
 		log.Printf("Scheduler: failed to update task as completed: %v", err)
 	}
 }
-
-// timePtr returns a pointer to a time.Time value.
-func timePtr(t time.Time) *time.Time {
-	return &t
-}
