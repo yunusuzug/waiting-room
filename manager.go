@@ -17,11 +17,13 @@ import (
 // Create a new TaskManager using New(), register handlers with RegisterHandler(),
 // and start background workers with StartWorkers().
 type TaskManager struct {
-	config    Config
-	room      *room
-	registry  *handlerRegistry
-	scheduler *scheduler
-	db        *sql.DB
+	config         Config
+	room           *room
+	registry       *handlerRegistry
+	scheduler      *scheduler
+	slackNotifier  *SlackNotifier
+	db             *sql.DB
+	instanceID     string
 }
 
 // New creates a new TaskManager with the given configuration.
@@ -78,10 +80,11 @@ func New(config Config) (*TaskManager, error) {
 	}
 
 	tm := &TaskManager{
-		config:   config,
-		room:     r,
-		registry: newHandlerRegistry(),
-		db:       db,
+		config:     config,
+		room:       r,
+		registry:   newHandlerRegistry(),
+		db:         db,
+		instanceID: uuid.New().String(),
 	}
 
 	return tm, nil
@@ -306,6 +309,10 @@ func (tm *TaskManager) Retry(ctx context.Context, taskID string) (*Task, error) 
 // The scheduler runs in the background and polls for tasks to execute.
 // It uses distributed locking to ensure only one instance processes tasks at a time.
 //
+// If Slack webhook is configured, this also starts the Slack notifier which sends
+// periodic summaries of tasks requiring attention. The notifier uses distributed
+// locking to ensure only one instance sends notifications.
+//
 // Returns ErrWorkersAlreadyRunning if workers are already running.
 func (tm *TaskManager) StartWorkers(ctx context.Context) error {
 	if tm.scheduler != nil {
@@ -321,10 +328,20 @@ func (tm *TaskManager) StartWorkers(ctx context.Context) error {
 		tm.config.MaxConcurrentTasks,
 	)
 
-	return tm.scheduler.start(ctx)
+	if err := tm.scheduler.start(ctx); err != nil {
+		return err
+	}
+
+	// Start Slack notifier if webhook is configured
+	if tm.config.Slack.WebhookURL != "" {
+		tm.slackNotifier = newSlackNotifier(tm.room, tm.config.Slack, tm.instanceID)
+		tm.slackNotifier.start(ctx)
+	}
+
+	return nil
 }
 
-// StopWorkers stops the background scheduler gracefully.
+// StopWorkers stops the background scheduler and Slack notifier gracefully.
 // This waits for any currently running tasks to complete before returning.
 //
 // Returns ErrWorkersNotRunning if workers are not running.
@@ -335,6 +352,13 @@ func (tm *TaskManager) StopWorkers() error {
 
 	tm.scheduler.stop()
 	tm.scheduler = nil
+
+	// Stop Slack notifier if running
+	if tm.slackNotifier != nil {
+		tm.slackNotifier.stop()
+		tm.slackNotifier = nil
+	}
+
 	return nil
 }
 

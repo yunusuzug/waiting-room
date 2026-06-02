@@ -98,6 +98,10 @@ type Config struct {
 	// Use this if you prefer to run migrations manually.
 	// Default is false (migration runs automatically).
 	SkipMigration bool
+
+	// Slack contains the configuration for Slack notifications.
+	// If WebhookURL is empty, Slack notifications are disabled.
+	Slack SlackConfig
 }
 
 // setDefaults applies default values for unspecified configuration options.

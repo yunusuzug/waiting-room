@@ -11,6 +11,7 @@ A Go library for managing tasks with approval workflows, scheduling, and distrib
 - **Class-Based Handlers**: Applications implement the `TaskHandler` interface for task types
 - **Custom Metadata**: Store additional custom data with each task
 - **Automatic Migrations**: Database tables are created automatically on initialization
+- **Slack Notifications**: Optional Slack integration sends periodic summaries of tasks requiring attention
 
 ## Installation
 
@@ -71,6 +72,11 @@ func main() {
             SSLMode:  "disable",
         },
         WorkerInterval: time.Minute,
+        // Optional: Slack notifications for task summaries
+        Slack: waitingroom.SlackConfig{
+            WebhookURL:           "https://hooks.slack.com/services/...",
+            NotificationInterval: 24 * time.Hour, // Daily summary
+        },
     }
 
     tm, err := waitingroom.New(config)
@@ -138,10 +144,20 @@ type Config struct {
     LockTimeout        time.Duration   // Lock timeout (default: 5m)
     MaxConcurrentTasks int             // Max concurrent tasks (default: 10)
     SkipMigration      bool            // Skip automatic migration (default: false)
+    Slack              SlackConfig     // Slack notification config (optional)
 }
 ```
 
 **Note**: `instanceID` is auto-generated internally on each startup.
+
+### SlackConfig
+
+```go
+type SlackConfig struct {
+    WebhookURL           string        // Slack incoming webhook URL
+    NotificationInterval time.Duration // Interval between summaries (default: 24h)
+}
+```
 
 ## Automatic Migrations
 
@@ -515,7 +531,8 @@ curl -X POST "http://localhost:8080/tasks/{task-id}/approve?by=admin"
 |------|---------|
 | `handler.go` | Package documentation and `TaskHandler` interface |
 | `models.go` | `Task` model, status types, options, filters |
-| `config.go` | `Config` and `DatabaseConfig` |
+| `config.go` | `Config`, `DatabaseConfig`, `SlackConfig` |
+| `slack.go` | `SlackNotifier` and Slack integration |
 | `approval.go` | `ApprovalDecision` and helper functions |
 | `errors.go` | Exported error variables |
 | `manager.go` | `TaskManager` - main public API |
@@ -535,6 +552,49 @@ When running multiple instances, the library uses PostgreSQL-based distributed l
 3. Failed instances automatically release their locks after the timeout
 
 The `instanceID` is auto-generated internally on each startup, so no configuration is needed regardless of deployment environment.
+
+## Slack Notifications
+
+Configure Slack notifications to receive periodic summaries of tasks requiring attention. The summary includes counts of:
+- Tasks pending approval
+- Scheduled tasks
+- Approved tasks waiting to run
+- Failed tasks requiring retry
+- Currently running tasks
+
+### Configuration
+
+```go
+config := waitingroom.Config{
+    Database: dbConfig,
+    Slack: waitingroom.SlackConfig{
+        WebhookURL:           "https://hooks.slack.com/services/...",
+        NotificationInterval: 24 * time.Hour, // Daily (default if not specified)
+    },
+}
+```
+
+### How It Works
+
+- The Slack notifier runs automatically when `StartWorkers()` is called
+- Uses the same distributed locking mechanism as the scheduler
+- Only one instance sends the summary, regardless of how many pods are running
+- Messages are sent at the configured interval (daily by default)
+- If Slack webhook is not configured, notifications are silently disabled
+
+### Slack Message Format
+
+The notification includes a rich message with emoji indicators:
+- :hourglass_flowing_sand: Pending Approval
+- :calendar: Scheduled
+- :white_check_mark: Approved
+- :x: Failed
+- :rocket: Running
+
+The attachment color indicates status:
+- **Green**: All clear or only pending tasks
+- **Yellow**: Tasks awaiting approval
+- **Red**: Failed tasks need attention
 
 ## Error Handling
 

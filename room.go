@@ -290,3 +290,45 @@ func (r *room) scanTasks(rows *sql.Rows) ([]*Task, error) {
 
 	return tasks, rows.Err()
 }
+
+// getTaskSummary retrieves the count of tasks grouped by status.
+func (r *room) getTaskSummary(ctx context.Context) (*TaskSummary, error) {
+	query := fmt.Sprintf(`
+		SELECT status, COUNT(*) 
+		FROM %s 
+		WHERE status IN ($1, $2, $3, $4, $5)
+		GROUP BY status
+	`, tasksTableName)
+
+	rows, err := r.db.QueryContext(ctx, query,
+		TaskStatusPending, TaskStatusApproved, TaskStatusScheduled, TaskStatusRunning, TaskStatusFailed,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	summary := &TaskSummary{}
+	for rows.Next() {
+		var status TaskStatus
+		var count int
+		if err := rows.Scan(&status, &count); err != nil {
+			return nil, err
+		}
+
+		switch status {
+		case TaskStatusPending:
+			summary.Pending = count
+		case TaskStatusApproved:
+			summary.Approved = count
+		case TaskStatusScheduled:
+			summary.Scheduled = count
+		case TaskStatusRunning:
+			summary.Running = count
+		case TaskStatusFailed:
+			summary.Failed = count
+		}
+	}
+
+	return summary, rows.Err()
+}
